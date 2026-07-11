@@ -1,0 +1,40 @@
+# build outputs
+target/
+dist/
+build/
+out/
+*.class
+*.jar
+*.war
+*.ear
+*.map
+
+# dependencies
+node_modules/
+.pnpm-store/
+
+# IDE and OS
+.idea/
+.vscode/
+*.iml
+.classpath
+.project
+.settings/
+.factorypath
+.DS_Store
+Thumbs.db
+
+# logs and temp
+*.log
+*.tmp
+*.bak
+.cache/
+.wrangler/
+supabase/.temp/
+
+# secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
