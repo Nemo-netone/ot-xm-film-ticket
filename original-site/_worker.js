@@ -3,8 +3,8 @@ export default {
     try {
       const url = new URL(request.url);
       if (request.method === "OPTIONS") return new Response(null, { headers: corsHeaders(request, env) });
-      const legacyPaths = ["/login", "/film/", "/cinema/", "/show/", "/orders/", "/comment/", "/notice/", "/type/", "/actor/", "/statistics/"];
-      const isLegacy = (url.pathname === "/login" && request.method === "POST") || legacyPaths.filter((path) => path !== "/login").some((path) => url.pathname.startsWith(path));
+      const legacyPaths = ["/login", "/film/", "/cinema/", "/show/", "/orders/", "/comment/", "/notice/", "/type/", "/area/", "/actor/", "/statistics/"];
+      const isLegacy = url.pathname === "/getYear" || (url.pathname === "/login" && request.method === "POST") || legacyPaths.filter((path) => path !== "/login").some((path) => url.pathname.startsWith(path));
       if (env.ASSETS && !url.pathname.startsWith("/api/") && !isLegacy && url.pathname !== "/health") return env.ASSETS.fetch(request);
 
       if (url.pathname === "/health") {
@@ -12,6 +12,7 @@ export default {
       }
 
       if (isLegacy) return json(request, env, await legacyApi(request, url, env));
+      if (url.pathname.startsWith("/api/recommendations/")) return json(request, env, await filmRecommendations(env));
       if (!url.pathname.startsWith("/api/")) return json(request, env, result(false, "API path not found", null), 404);
       const body = await parseBody(request);
       const parts = url.pathname.replace(/^\/api\/?/, "").split("/").filter(Boolean);
@@ -33,13 +34,14 @@ const filmModules = { film: "film", cinema: "cinema", show: "show", orders: "ord
 async function legacyApi(request, url, env) {
   const body = await parseBody(request), parts = url.pathname.split("/").filter(Boolean);
   if (url.pathname === "/login") return filmLogin(body, env);
+  if (url.pathname === "/getYear") return filmResult(["2026", "2025", "2024", "2023", "2022"]);
   if (url.pathname === "/statistics/base") return filmResult({ filmCount: 3, cinemaCount: 3, todayPrice: 2860.5, totalPrice: 128600.0 });
   if (url.pathname === "/statistics/line") return filmResult({ xAxis: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"], yAxis: [1200, 1680, 1420, 2180, 2860, 3950, 3680] });
   if (url.pathname === "/statistics/bar") return filmResult({ xAxis: ["Film A", "Film B", "Film C"], yAxis: [320, 260, 180] });
   if (url.pathname === "/statistics/pie") return filmResult([{ name: "Action", value: 38 }, { name: "Drama", value: 34 }, { name: "Animation", value: 28 }]);
   if (url.pathname === "/orders/todayTotal") return filmResult({ total: 2860.5, time: new Date().toISOString() });
   const [resource = "film", action = "selectPage", id = ""] = parts, moduleKey = filmModules[resource] || resource;
-  if (["selectPage", "selectAll", "selectTotalTop", "selectScoreTop"].includes(action)) return filmList(moduleKey, url, env);
+  if (["selectPage", "selectAll", "selectTotalTop", "selectScoreTop"].includes(action)) return filmList(moduleKey, action, url, env);
   if (action === "selectById") return filmInfo(id, env);
   if (action === "add") return filmSave(moduleKey, body, env);
   if (action === "update") return filmUpdate(moduleKey, body, env);
@@ -53,10 +55,17 @@ async function filmLogin(body, env) {
   if (!rows.length) return { code: "500", msg: "Invalid demo account", data: null };
   const row = rows[0]; return filmResult({ id: row.id, username: row.username, name: row.display_name, role: body.role, token: `demo-${role}-${row.id}` });
 }
-async function filmList(moduleKey, url, env) {
+async function filmList(moduleKey, action, url, env) {
   const rows = await requestSupabase(env, "items", "GET", { module_key: `eq.${moduleKey}`, order: "updated_at.desc" });
   const list = rows.map(filmRow), pageNum = Math.max(Number(url.searchParams.get("pageNum") || 1), 1), pageSize = Math.max(Number(url.searchParams.get("pageSize") || 10), 1), start = (pageNum - 1) * pageSize;
+  if (action === "selectAll") return filmResult(list);
+  if (action === "selectTotalTop") return filmResult([...list].sort((a, b) => Number(b.total) - Number(a.total)).slice(0, 10));
+  if (action === "selectScoreTop") return filmResult([...list].sort((a, b) => Number(b.score) - Number(a.score)).slice(0, 10));
   return filmResult({ list: list.slice(start, start + pageSize), total: list.length, pageNum, pageSize });
+}
+async function filmRecommendations(env) {
+  const rows = await requestSupabase(env, "items", "GET", { module_key: "eq.film", order: "updated_at.desc", limit: "8" });
+  return filmResult(rows.map(filmRow));
 }
 async function filmInfo(id, env) { const rows = await requestSupabase(env, "items", "GET", { id: `eq.${id}`, limit: "1" }); return filmResult(rows[0] ? filmRow(rows[0]) : null); }
 async function filmSave(moduleKey, body, env) { const rows = await requestSupabase(env, "items", "POST", {}, filmPayload(moduleKey, body)); return filmResult(rows[0] ? filmRow(rows[0]) : null); }
@@ -64,7 +73,7 @@ async function filmUpdate(moduleKey, body, env) { const rows = await requestSupa
 async function filmDelete(id, env) { if (id) await requestSupabase(env, "items", "DELETE", { id: `eq.${id}` }); return filmResult(null); }
 async function filmDeleteBatch(ids, env) { for (const id of Array.isArray(ids) ? ids : []) await requestSupabase(env, "items", "DELETE", { id: `eq.${id}` }); return filmResult(null); }
 function filmPayload(moduleKey, body) { return { module_key: moduleKey, title: String(body.title || body.name || "Film demo record"), subtitle: String(body.subtitle || body.type || "Original Vue data"), status: String(body.status || "Showing"), owner: String(body.owner || body.cinemaName || "Admin"), amount: Number(body.price || body.amount || body.score || 0), description: String(body.description || body.content || body.introduction || ""), extra: body, updated_at: new Date().toISOString() }; }
-function filmRow(row) { const extra = row.extra && typeof row.extra === "object" ? row.extra : {}; return { ...extra, id: row.id, title: extra.title || row.title, name: extra.name || row.title, status: extra.status || row.status, cinemaName: extra.cinemaName || row.owner, price: extra.price || row.amount, score: extra.score || Math.min(9.8, 7 + Number(row.id % 3)), total: extra.total || Number(row.amount || 0), introduction: extra.introduction || row.description, content: extra.content || row.description, cover: extra.cover || "", createTime: row.created_at }; }
+function filmRow(row) { const extra = row.extra && typeof row.extra === "object" ? row.extra : {}; const image = extra.img || extra.cover || ""; return { ...extra, id: row.id, title: extra.title || row.title, name: extra.name || row.title, status: extra.status || row.status, cinemaName: extra.cinemaName || row.owner, price: extra.price || row.amount, score: extra.score || Math.min(9.8, 7 + Number(row.id % 3)), total: extra.total || Number(row.amount || 0), introduction: extra.introduction || row.description, content: extra.content || row.description, img: image, cover: image, createTime: row.created_at }; }
 function filmResult(data) { return { code: "200", msg: "ok", data }; }
 async function login(body, env) {
   const role = String(body.role || "").trim();

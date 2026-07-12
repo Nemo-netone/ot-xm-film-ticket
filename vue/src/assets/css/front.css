@@ -1,0 +1,109 @@
+.front-notice {
+    padding: 5px 20px;
+    color: #666;
+    font-size: 12px;
+    display: flex;
+    align-items: center;
+}
+
+.front-header {
+    display: flex;
+    height: 60px;
+    line-height: 60px;
+    border-bottom: 1px solid #eee;
+}
+
+.front-header-left {
+    width: 350px;
+    display: flex;
+    align-items: center;
+    padding-left: 30px;
+}
+
+.front-header-left img {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+}
+
+.front-header-left .title {
+    color: #333;
+    cursor: pointer;
+    margin-left: 10px;
+    font-size: 20px;
+    font-weight: bold;
+}
+
+.front-header-center {
+    flex: 1;
+}
+
+.front-header-right {
+    padding-right: 20px;
+}
+
+.front-header-search {
+    width: 450px;
+}
+
+.main-content {
+    width: 80%;
+    margin: 5px auto;
+}
+
+/*Element-Plus样式覆盖*/
+.el-menu--horizontal {
+    border: none !important;
+    height: 59px;
+}
+.el-tooltip__trigger {
+    outline: none;
+}
+
+@media (max-width: 760px) {
+    .front-header {
+        height: auto;
+        min-height: 60px;
+        line-height: normal;
+        flex-wrap: wrap;
+        padding: 8px 10px;
+        gap: 8px 12px;
+    }
+
+    .front-header-left {
+        width: auto;
+        flex: 1;
+        padding-left: 0;
+    }
+
+    .front-header-left .title {
+        font-size: 17px;
+    }
+
+    .front-header-center {
+        order: 3;
+        width: 100%;
+        flex-basis: 100%;
+        overflow-x: auto;
+    }
+
+    .front-header-center .el-menu {
+        min-width: max-content;
+    }
+
+    .front-header-search {
+        order: 4;
+        width: 100%;
+        display: flex;
+    }
+
+    .front-header-search .el-input {
+        width: auto !important;
+        flex: 1;
+        min-width: 0;
+    }
+
+    .front-header-right {
+        padding-right: 0;
+    }
+}
